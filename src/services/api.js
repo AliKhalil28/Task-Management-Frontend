@@ -12,47 +12,63 @@ const handleResponse = async (response) => {
   return response.json();
 };
 
-// Get auth token from localStorage
-const getAuthToken = () => {
-  const user = localStorage.getItem("user");
-  if (!user) return null;
-
-  try {
-    const userData = JSON.parse(user);
-    return userData.token || userData.accessToken || null;
-  } catch (error) {
-    console.error("Error parsing user data:", error);
-    return null;
-  }
-};
-
 // Helper function to check if user is authenticated
 const isAuthenticated = () => {
-  const token = getAuthToken();
-  return !!token;
+  // Check multiple storage locations
+  try {
+    if (localStorage.getItem("authToken")) return true;
+  } catch (e) {}
+
+  try {
+    if (sessionStorage.getItem("authToken")) return true;
+  } catch (e) {}
+
+  return false;
 };
 
-// Helper function to make authenticated requests - HYBRID approach
-const authenticatedFetch = async (url, options = {}) => {
-  const token = getAuthToken();
+// Get auth token from any available storage
+const getAuthToken = () => {
+  // Try localStorage
+  try {
+    const localToken = localStorage.getItem("authToken");
+    if (localToken) return localToken;
+  } catch (e) {
+    console.warn("Failed to get token from localStorage:", e);
+  }
 
-  if (!token && !isAuthenticated()) {
+  // Try sessionStorage
+  try {
+    const sessionToken = sessionStorage.getItem("authToken");
+    if (sessionToken) return sessionToken;
+  } catch (e) {
+    console.warn("Failed to get token from sessionStorage:", e);
+  }
+
+  return null;
+};
+
+// Helper function to make authenticated requests - ROBUST approach
+const authenticatedFetch = async (url, options = {}, token = null) => {
+  // Use provided token or get from storage
+  const authToken = token || getAuthToken();
+
+  if (!authToken && !isAuthenticated()) {
     throw new Error("Authentication required. Please log in.");
   }
 
   try {
     const fetchOptions = {
       ...options,
-      credentials: "include", // Still include cookies for desktop
+      credentials: "include", // Include cookies for desktop
       headers: {
         "Content-Type": "application/json",
-        ...(token && { Authorization: `Bearer ${token}` }), // Add token header if available
+        ...(authToken && { Authorization: `Bearer ${authToken}` }), // Always include token header
         ...options.headers,
       },
     };
 
     console.log("Making request to:", url);
-    console.log("With token:", token ? "Present" : "Missing");
+    console.log("With auth header:", authToken ? "Present" : "Missing");
 
     const response = await fetch(url, fetchOptions);
 
@@ -61,32 +77,40 @@ const authenticatedFetch = async (url, options = {}) => {
       console.log("401 Unauthorized - attempting token refresh");
 
       try {
-        // Try to refresh the token using both methods
+        // Try to refresh the token
         const refreshResponse = await fetch(`${BASE_URL}/users/refresh-token`, {
           method: "POST",
           credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            ...(token && { Authorization: `Bearer ${token}` }),
+            ...(authToken && { Authorization: `Bearer ${authToken}` }),
           },
+          body: JSON.stringify({ token: authToken }), // Also send token in body
         });
 
         if (refreshResponse.ok) {
           const refreshData = await refreshResponse.json();
 
           // Update stored token if provided in response
-          if (refreshData.data?.accessToken || refreshData.accessToken) {
-            const currentUser = JSON.parse(
-              localStorage.getItem("user") || "{}"
-            );
-            const newToken =
-              refreshData.data?.accessToken || refreshData.accessToken;
-            const updatedUser = {
-              ...currentUser,
-              token: newToken,
-              accessToken: newToken,
-            };
-            localStorage.setItem("user", JSON.stringify(updatedUser));
+          const newToken =
+            refreshData.data?.accessToken ||
+            refreshData.accessToken ||
+            refreshData.data?.token ||
+            refreshData.token;
+
+          if (newToken) {
+            // Store token in multiple places
+            try {
+              localStorage.setItem("authToken", newToken);
+            } catch (e) {
+              console.warn("Failed to store token in localStorage:", e);
+            }
+
+            try {
+              sessionStorage.setItem("authToken", newToken);
+            } catch (e) {
+              console.warn("Failed to store token in sessionStorage:", e);
+            }
 
             // Retry original request with new token
             const retryOptions = {
@@ -99,19 +123,22 @@ const authenticatedFetch = async (url, options = {}) => {
             const retryResponse = await fetch(url, retryOptions);
             return handleResponse(retryResponse);
           }
-
-          console.log(
-            "Token refreshed successfully, retrying original request"
-          );
-          // Retry the original request
-          const retryResponse = await fetch(url, fetchOptions);
-          return handleResponse(retryResponse);
         } else {
           throw new Error("Token refresh failed");
         }
       } catch (refreshError) {
         console.error("Token refresh failed:", refreshError);
-        localStorage.removeItem("user");
+
+        // Clear tokens from all storages
+        try {
+          localStorage.removeItem("authToken");
+          localStorage.removeItem("user");
+        } catch (e) {}
+
+        try {
+          sessionStorage.removeItem("authToken");
+        } catch (e) {}
+
         throw new Error("Session expired. Please log in again.");
       }
     }
@@ -141,15 +168,29 @@ export const authAPI = {
       const data = await handleResponse(response);
       console.log("Register response:", data);
 
+      // Store token in multiple places
+      const token = data.data?.token || data.data?.accessToken || data.token;
+      if (token) {
+        try {
+          localStorage.setItem("authToken", token);
+        } catch (e) {
+          console.warn("Failed to store token in localStorage:", e);
+        }
+
+        try {
+          sessionStorage.setItem("authToken", token);
+        } catch (e) {
+          console.warn("Failed to store token in sessionStorage:", e);
+        }
+      }
+
       if (data.data?.user) {
-        // Store user data with token for mobile compatibility
-        const userToStore = {
-          ...data.data.user,
-          token: data.data.token || data.data.accessToken || data.token,
-          accessToken: data.data.token || data.data.accessToken || data.token,
-        };
-        localStorage.setItem("user", JSON.stringify(userToStore));
-        console.log("User stored:", userToStore);
+        // Store user data
+        try {
+          localStorage.setItem("user", JSON.stringify(data.data.user));
+        } catch (e) {
+          console.warn("Failed to store user in localStorage:", e);
+        }
       }
 
       return data;
@@ -175,15 +216,32 @@ export const authAPI = {
       const data = await handleResponse(response);
       console.log("Login response:", data);
 
+      // Store token in multiple places
+      const token = data.data?.token || data.data?.accessToken || data.token;
+      if (token) {
+        console.log("Storing auth token:", token.substring(0, 10) + "...");
+        try {
+          localStorage.setItem("authToken", token);
+        } catch (e) {
+          console.warn("Failed to store token in localStorage:", e);
+        }
+
+        try {
+          sessionStorage.setItem("authToken", token);
+        } catch (e) {
+          console.warn("Failed to store token in sessionStorage:", e);
+        }
+      } else {
+        console.warn("No token found in login response");
+      }
+
       if (data.data?.user) {
-        // Store user data with token for mobile compatibility
-        const userToStore = {
-          ...data.data.user,
-          token: data.data.token || data.data.accessToken || data.token,
-          accessToken: data.data.token || data.data.accessToken || data.token,
-        };
-        localStorage.setItem("user", JSON.stringify(userToStore));
-        console.log("User stored after login:", userToStore);
+        // Store user data
+        try {
+          localStorage.setItem("user", JSON.stringify(data.data.user));
+        } catch (e) {
+          console.warn("Failed to store user in localStorage:", e);
+        }
       }
 
       return data;
@@ -193,9 +251,8 @@ export const authAPI = {
     }
   },
 
-  logout: async () => {
+  logout: async (token) => {
     try {
-      const token = getAuthToken();
       await fetch(`${BASE_URL}/users/logout`, {
         method: "POST",
         headers: {
@@ -207,30 +264,68 @@ export const authAPI = {
     } catch (error) {
       console.error("Logout API error:", error);
     } finally {
-      localStorage.removeItem("user");
+      // Clear tokens from all storages
+      try {
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("user");
+      } catch (e) {}
+
+      try {
+        sessionStorage.removeItem("authToken");
+      } catch (e) {}
     }
   },
 
-  getUserProfile: async () => {
-    return authenticatedFetch(`${BASE_URL}/users/profile`);
+  refreshToken: async (token) => {
+    try {
+      const response = await fetch(`${BASE_URL}/users/refresh-token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        credentials: "include",
+        body: JSON.stringify({ token }),
+      });
+
+      return handleResponse(response);
+    } catch (error) {
+      console.error("Token refresh error:", error);
+      throw error;
+    }
   },
 
-  updateProfile: async (profileData) => {
-    return authenticatedFetch(`${BASE_URL}/users/update-profile`, {
-      method: "PATCH",
-      body: JSON.stringify(profileData),
-    });
+  getUserProfile: async (token) => {
+    return authenticatedFetch(`${BASE_URL}/users/profile`, {}, token);
   },
 
-  changePassword: async (passwordData) => {
-    return authenticatedFetch(`${BASE_URL}/users/change-password`, {
-      method: "POST",
-      body: JSON.stringify(passwordData),
-    });
+  updateProfile: async (profileData, token) => {
+    return authenticatedFetch(
+      `${BASE_URL}/users/update-profile`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(profileData),
+      },
+      token
+    );
+  },
+
+  changePassword: async (passwordData, token) => {
+    return authenticatedFetch(
+      `${BASE_URL}/users/change-password`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          oldPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword,
+        }),
+      },
+      token
+    );
   },
 };
 
-// Tasks API - keeping the same structure
+// Tasks API - using the same authenticatedFetch with token
 export const tasksAPI = {
   getAllTasks: async (page = 1, limit = 10, filters = {}) => {
     try {
@@ -349,4 +444,4 @@ export const tasksAPI = {
 };
 
 // Export helper functions
-export { isAuthenticated };
+export { isAuthenticated, getAuthToken };
