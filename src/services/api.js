@@ -12,30 +12,47 @@ const handleResponse = async (response) => {
   return response.json();
 };
 
-// Helper function to check if user is authenticated
-const isAuthenticated = () => {
+// Get auth token from localStorage
+const getAuthToken = () => {
   const user = localStorage.getItem("user");
-  return !!user;
+  if (!user) return null;
+
+  try {
+    const userData = JSON.parse(user);
+    return userData.token || userData.accessToken || null;
+  } catch (error) {
+    console.error("Error parsing user data:", error);
+    return null;
+  }
 };
 
-// Helper function to make authenticated requests with cookies
+// Helper function to check if user is authenticated
+const isAuthenticated = () => {
+  const token = getAuthToken();
+  return !!token;
+};
+
+// Helper function to make authenticated requests - HYBRID approach
 const authenticatedFetch = async (url, options = {}) => {
-  if (!isAuthenticated()) {
+  const token = getAuthToken();
+
+  if (!token && !isAuthenticated()) {
     throw new Error("Authentication required. Please log in.");
   }
 
   try {
     const fetchOptions = {
       ...options,
-      credentials: "include", // This is crucial for cookies
+      credentials: "include", // Still include cookies for desktop
       headers: {
         "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }), // Add token header if available
         ...options.headers,
       },
     };
 
     console.log("Making request to:", url);
-    console.log("With credentials: include");
+    console.log("With token:", token ? "Present" : "Missing");
 
     const response = await fetch(url, fetchOptions);
 
@@ -44,16 +61,45 @@ const authenticatedFetch = async (url, options = {}) => {
       console.log("401 Unauthorized - attempting token refresh");
 
       try {
-        // Try to refresh the token
+        // Try to refresh the token using both methods
         const refreshResponse = await fetch(`${BASE_URL}/users/refresh-token`, {
           method: "POST",
           credentials: "include",
           headers: {
             "Content-Type": "application/json",
+            ...(token && { Authorization: `Bearer ${token}` }),
           },
         });
 
         if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json();
+
+          // Update stored token if provided in response
+          if (refreshData.data?.accessToken || refreshData.accessToken) {
+            const currentUser = JSON.parse(
+              localStorage.getItem("user") || "{}"
+            );
+            const newToken =
+              refreshData.data?.accessToken || refreshData.accessToken;
+            const updatedUser = {
+              ...currentUser,
+              token: newToken,
+              accessToken: newToken,
+            };
+            localStorage.setItem("user", JSON.stringify(updatedUser));
+
+            // Retry original request with new token
+            const retryOptions = {
+              ...fetchOptions,
+              headers: {
+                ...fetchOptions.headers,
+                Authorization: `Bearer ${newToken}`,
+              },
+            };
+            const retryResponse = await fetch(url, retryOptions);
+            return handleResponse(retryResponse);
+          }
+
           console.log(
             "Token refreshed successfully, retrying original request"
           );
@@ -88,7 +134,7 @@ export const authAPI = {
         headers: {
           "Content-Type": "application/json",
         },
-        credentials: "include", // Include cookies
+        credentials: "include",
         body: JSON.stringify(userData),
       });
 
@@ -96,9 +142,14 @@ export const authAPI = {
       console.log("Register response:", data);
 
       if (data.data?.user) {
-        // Store user data (no token needed since using cookies)
-        localStorage.setItem("user", JSON.stringify(data.data.user));
-        console.log("User stored:", data.data.user);
+        // Store user data with token for mobile compatibility
+        const userToStore = {
+          ...data.data.user,
+          token: data.data.token || data.data.accessToken || data.token,
+          accessToken: data.data.token || data.data.accessToken || data.token,
+        };
+        localStorage.setItem("user", JSON.stringify(userToStore));
+        console.log("User stored:", userToStore);
       }
 
       return data;
@@ -117,7 +168,7 @@ export const authAPI = {
         headers: {
           "Content-Type": "application/json",
         },
-        credentials: "include", // Include cookies
+        credentials: "include",
         body: JSON.stringify(credentials),
       });
 
@@ -125,9 +176,14 @@ export const authAPI = {
       console.log("Login response:", data);
 
       if (data.data?.user) {
-        // Store user data (cookies handle authentication)
-        localStorage.setItem("user", JSON.stringify(data.data.user));
-        console.log("User stored after login:", data.data.user);
+        // Store user data with token for mobile compatibility
+        const userToStore = {
+          ...data.data.user,
+          token: data.data.token || data.data.accessToken || data.token,
+          accessToken: data.data.token || data.data.accessToken || data.token,
+        };
+        localStorage.setItem("user", JSON.stringify(userToStore));
+        console.log("User stored after login:", userToStore);
       }
 
       return data;
@@ -139,12 +195,14 @@ export const authAPI = {
 
   logout: async () => {
     try {
+      const token = getAuthToken();
       await fetch(`${BASE_URL}/users/logout`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
         },
-        credentials: "include", // Include cookies
+        credentials: "include",
       });
     } catch (error) {
       console.error("Logout API error:", error);
@@ -172,17 +230,15 @@ export const authAPI = {
   },
 };
 
-// Tasks API
+// Tasks API - keeping the same structure
 export const tasksAPI = {
   getAllTasks: async (page = 1, limit = 10, filters = {}) => {
     try {
-      // Build query parameters
       const params = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
       });
 
-      // Add filters if they exist and are not default values
       if (filters.status && filters.status !== "all") {
         params.append("status", filters.status);
       }
