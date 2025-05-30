@@ -4,10 +4,21 @@ const BASE_URL = import.meta.env.VITE_API_URL;
 // Helper function to handle API responses
 const handleResponse = async (response) => {
   if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ message: "Network error" }));
-    throw new Error(error.message || `HTTP error! status: ${response.status}`);
+    if (response.status === 401) {
+      const error = await response
+        .json()
+        .catch(() => ({ message: "Invalid Credentials" }));
+      throw new Error(
+        error.message || `HTTP error! status: ${response.status}`
+      );
+    } else {
+      const error = await response
+        .json()
+        .catch(() => ({ message: "Server Error" }));
+      throw new Error(
+        error.message || `HTTP error! status: ${response.status}`
+      );
+    }
   }
   return response.json();
 };
@@ -67,12 +78,10 @@ const authenticatedFetch = async (url, options = {}, token = null) => {
       },
     };
 
-
     const response = await fetch(url, fetchOptions);
 
     // If unauthorized, try refresh token once
     if (response.status === 401) {
-
       try {
         // Try to refresh the token
         const refreshResponse = await fetch(`${BASE_URL}/users/refresh-token`, {
@@ -150,7 +159,6 @@ const authenticatedFetch = async (url, options = {}, token = null) => {
 export const authAPI = {
   register: async (userData) => {
     try {
-
       const response = await fetch(`${BASE_URL}/users/register`, {
         method: "POST",
         headers: {
@@ -196,13 +204,12 @@ export const authAPI = {
 
   login: async (credentials) => {
     try {
-
       const response = await fetch(`${BASE_URL}/users/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        // credentials: "include",
+        credentials: "include",
         body: JSON.stringify(credentials),
       });
 

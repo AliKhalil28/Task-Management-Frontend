@@ -20,6 +20,7 @@ const RegisterForm = () => {
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState("");
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -36,6 +37,8 @@ const RegisterForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    setIsLoading("Registering new user please wait");
     setErrors({});
 
     // Validation
@@ -80,7 +83,7 @@ const RegisterForm = () => {
     setLoading(true);
     try {
       await register(formData);
-      navigate("/dashboard");
+      navigate("/login");
     } catch (error) {
       setErrors({ general: error.message || "Registration failed" });
     } finally {
@@ -138,6 +141,11 @@ const RegisterForm = () => {
             {errors.general && (
               <div className="bg-red-500/20 border border-red-500/30 rounded-md p-3">
                 <p className="text-red-400 text-sm">{errors.general}</p>
+              </div>
+            )}
+            {isLoading && !errors && (
+              <div className="bg-blue-500/20 border border-blue-500/30 rounded-md p-3">
+                <p className="text-blue-400 text-sm">{isLoading}</p>
               </div>
             )}
 

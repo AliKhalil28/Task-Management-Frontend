@@ -13,6 +13,7 @@ const LoginForm = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState("");
   const [error, setError] = useState("");
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ const LoginForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setIsLoading("Logging in please wait");
     setError("");
 
     try {
@@ -62,6 +64,11 @@ const LoginForm = () => {
             {error && (
               <div className="bg-red-500/20 border border-red-500/30 rounded-md p-3">
                 <p className="text-red-400 text-sm">{error}</p>
+              </div>
+            )}
+            {isLoading && !error && (
+              <div className="bg-blue-500/20 border border-blue-500/30 rounded-md p-3">
+                <p className="text-blue-400 text-sm">{isLoading}</p>
               </div>
             )}
 
