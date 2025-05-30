@@ -143,7 +143,7 @@ const RegisterForm = () => {
                 <p className="text-red-400 text-sm">{errors.general}</p>
               </div>
             )}
-            {isLoading && !errors && (
+            {isLoading && !errors.general && (
               <div className="bg-blue-500/20 border border-blue-500/30 rounded-md p-3">
                 <p className="text-blue-400 text-sm">{isLoading}</p>
               </div>
