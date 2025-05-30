@@ -1,5 +1,5 @@
 // Get the API URL from environment variables
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+const BASE_URL = import.meta.env.VITE_API_URL;
 
 // Helper function to handle API responses
 const handleResponse = async (response) => {
@@ -209,7 +209,7 @@ export const authAPI = {
         headers: {
           "Content-Type": "application/json",
         },
-        credentials: "include",
+        // credentials: "include",
         body: JSON.stringify(credentials),
       });
 
