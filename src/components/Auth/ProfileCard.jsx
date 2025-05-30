@@ -43,8 +43,6 @@ const ProfileCard = () => {
         fullName: formData.fullName.trim(),
       };
 
-      console.log("Sending update data:", updateData); // Debug log
-
       await updateProfile(updateData);
       setIsEditing(false);
       window.dispatchEvent(
@@ -53,7 +51,6 @@ const ProfileCard = () => {
         })
       );
     } catch (error) {
-      console.error("Profile update error:", error); // Debug log
       window.dispatchEvent(
         new CustomEvent("toast", {
           detail: {

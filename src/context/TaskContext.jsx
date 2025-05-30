@@ -336,7 +336,6 @@ export const TaskProvider = ({ children }) => {
 
   // Also fix the updateFilters function to ensure immediate update
   const updateFilters = (newFilters) => {
-    console.log("Updating filters:", newFilters); // Debug log
     setFilters(newFilters);
   };
 

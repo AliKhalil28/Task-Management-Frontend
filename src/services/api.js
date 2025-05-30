@@ -67,14 +67,11 @@ const authenticatedFetch = async (url, options = {}, token = null) => {
       },
     };
 
-    console.log("Making request to:", url);
-    console.log("With auth header:", authToken ? "Present" : "Missing");
 
     const response = await fetch(url, fetchOptions);
 
     // If unauthorized, try refresh token once
     if (response.status === 401) {
-      console.log("401 Unauthorized - attempting token refresh");
 
       try {
         // Try to refresh the token
@@ -145,7 +142,6 @@ const authenticatedFetch = async (url, options = {}, token = null) => {
 
     return handleResponse(response);
   } catch (error) {
-    console.error("API request failed:", error);
     throw error;
   }
 };
@@ -154,7 +150,6 @@ const authenticatedFetch = async (url, options = {}, token = null) => {
 export const authAPI = {
   register: async (userData) => {
     try {
-      console.log("Registering user to:", `${BASE_URL}/users/register`);
 
       const response = await fetch(`${BASE_URL}/users/register`, {
         method: "POST",
@@ -166,7 +161,6 @@ export const authAPI = {
       });
 
       const data = await handleResponse(response);
-      console.log("Register response:", data);
 
       // Store token in multiple places
       const token = data.data?.token || data.data?.accessToken || data.token;
@@ -202,7 +196,6 @@ export const authAPI = {
 
   login: async (credentials) => {
     try {
-      console.log("Logging in to:", `${BASE_URL}/users/login`);
 
       const response = await fetch(`${BASE_URL}/users/login`, {
         method: "POST",
@@ -214,12 +207,10 @@ export const authAPI = {
       });
 
       const data = await handleResponse(response);
-      console.log("Login response:", data);
 
       // Store token in multiple places
       const token = data.data?.token || data.data?.accessToken || data.token;
       if (token) {
-        console.log("Storing auth token:", token.substring(0, 10) + "...");
         try {
           localStorage.setItem("authToken", token);
         } catch (e) {

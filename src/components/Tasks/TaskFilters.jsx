@@ -69,7 +69,6 @@ const TaskFilters = () => {
           <select
             value={filters.status}
             onChange={(e) => {
-              console.log("Status filter changed to:", e.target.value); // Debug log
               const newFilters = { ...filters, status: e.target.value };
               setFilters(newFilters);
             }}
@@ -86,7 +85,6 @@ const TaskFilters = () => {
           <select
             value={filters.priority}
             onChange={(e) => {
-              console.log("Priority filter changed to:", e.target.value); // Debug log
               const newFilters = { ...filters, priority: e.target.value };
               setFilters(newFilters);
             }}

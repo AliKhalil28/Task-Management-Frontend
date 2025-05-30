@@ -89,16 +89,13 @@ export const AuthProvider = ({ children }) => {
       try {
         // First check for token
         const token = getStoredAuthToken();
-        console.log("Stored token found:", !!token);
 
         // Then check for user data
         const storedUser = localStorage.getItem("user");
-        console.log("Stored user data:", !!storedUser);
 
         if (token && storedUser) {
           // Parse stored user data
           const userData = JSON.parse(storedUser);
-          console.log("User data parsed successfully");
 
           // Set user in state
           setUser(userData);
@@ -106,7 +103,6 @@ export const AuthProvider = ({ children }) => {
           // Verify session is still valid
           try {
             const response = await authAPI.getUserProfile(token);
-            console.log("Profile verification successful:", response);
 
             // Update user data with fresh data from server
             const freshUserData = response.data?.user || response.data;
@@ -132,7 +128,6 @@ export const AuthProvider = ({ children }) => {
                   refreshResponse.data?.accessToken ||
                     refreshResponse.data?.token
                 );
-                console.log("Token refreshed successfully");
               } else {
                 throw new Error("No token in refresh response");
               }
@@ -176,7 +171,6 @@ export const AuthProvider = ({ children }) => {
         console.warn("No token received in login response");
       }
 
-      console.log("Setting user after login:", userData);
       setUser(userData);
       localStorage.setItem("user", JSON.stringify(userData));
       return userData;

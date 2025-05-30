@@ -23,13 +23,9 @@ const LoginForm = () => {
     setError("");
 
     try {
-      console.log("Form submission started"); // Debug log
       const user = await login(formData);
-      console.log("Login completed, user:", user); // Debug log
-      console.log("Navigating to dashboard"); // Debug log
       navigate("/dashboard");
     } catch (error) {
-      console.error("Login form error:", error); // Debug log
       setError(error.message || "Login failed");
     } finally {
       setLoading(false);

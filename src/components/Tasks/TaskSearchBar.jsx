@@ -7,7 +7,6 @@ const TaskSearchBar = () => {
 
   const handleSearchChange = (e) => {
     const searchValue = e.target.value;
-    console.log("Search changed to:", searchValue); // Debug log
     setFilters((prev) => ({
       ...prev,
       search: searchValue,
